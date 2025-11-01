@@ -4,24 +4,26 @@ mod models;
 
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
+use axum::Server; // Works for axum 0.6
 
-// Simple route handler
+// Basic root handler
 async fn root() -> &'static str {
     "Hello from GymBuddy API!"
 }
 
 #[tokio::main]
 async fn main() {
-    // Create the app and define routes
-    let app = Router::new().route("/", get(root));
+    // Create router with root route and merge API routes
+    let app = Router::new()
+        .route("/", get(root))
+        .merge(api::create_api_router());
 
-    // Define where the server listens
+    // Localhost
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-
     println!("GymBuddy API running at http://{}", addr);
 
-    // Start the server
-    axum::Server::bind(&addr)
+    // Start Axum 0.6 server
+    Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
