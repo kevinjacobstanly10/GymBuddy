@@ -13,6 +13,13 @@ async fn root() -> &'static str {
 
 #[tokio::main]
 async fn main() {
+
+    //Database connection
+    let _pool = db::connection::establish_connection().await;
+
+
+    println!("Database connected successfully!");
+
     // Create router with root route and merge API routes
     let app = Router::new()
         .route("/", get(root))

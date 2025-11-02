@@ -15,3 +15,7 @@ GymBuddy is a backend API in Rust that allows users to log workouts, track progr
 2. Run `cargo run`  
 3. Visit `http://127.0.0.1:3000` to test the API
 
+## Current Status
+- Axum server initialized and running at `http://127.0.0.1:3000`
+- SQLite database successfully connected via SQLx
+- Base API structure in place (`src/api`, `src/db`, `src/models`)
