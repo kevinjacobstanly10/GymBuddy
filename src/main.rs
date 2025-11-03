@@ -14,9 +14,9 @@ async fn root() -> &'static str {
 #[tokio::main]
 async fn main() {
 
-    //Database connection
-    let _pool = db::connection::establish_connection().await;
-
+    // Database connection
+    let pool = db::connection::establish_connection().await;
+    db::connection::init_db(&pool).await.expect("Failed to initialize database");
 
     println!("Database connected successfully!");
 
