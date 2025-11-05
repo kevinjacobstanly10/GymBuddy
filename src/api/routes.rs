@@ -1,12 +1,12 @@
 use axum::{
     extract::{Path, State},
-    routing::{get, post, delete},
+    routing::{get, post, delete,put},
     Json, Router,
 };
 use serde::{Serialize, Deserialize};
 use sqlx::SqlitePool;
 use crate::models::user::User;
-use crate::db::connection::{get_all_users,create_user_db, delete_user_db};
+use crate::db::connection::{get_all_users,create_user_db, update_user_db, delete_user_db};
 use crate::models::user::{NewUser};
 use sqlx::query_as;
 
@@ -42,6 +42,19 @@ pub async fn create_user(
     Json(user)
 }
 
+pub async fn update_user(
+    Path(id): Path<String>,
+    State(pool): State<SqlitePool>,
+    Json(updated_user): Json<NewUser>,
+) -> Json<User> {
+    let id = id.trim().parse::<i64>().expect("Invalid ID format");
+
+    let user = update_user_db(&pool, id, &updated_user)
+        .await
+        .expect("Failed to update user");
+    Json(user)
+}
+
 pub async fn delete_user(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -63,6 +76,6 @@ async fn health_check() -> Json<HealthResponse> {
 pub fn create_api_router() -> Router<SqlitePool> {
     Router::new()
         .route("/api/users", get(list_users).post(create_user))
-        .route("/api/users/:id", delete(delete_user)) 
+        .route("/api/users/:id", put(update_user).delete(delete_user))
         .route("/health", get(health_check))
 }

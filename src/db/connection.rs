@@ -55,6 +55,28 @@ pub async fn create_user_db(pool: &SqlitePool, new_user: &NewUser) -> Result<Use
     Ok(user)
 }
 
+pub async fn update_user_db(pool: &SqlitePool, id: i64, updated_user: &NewUser) -> Result<User, sqlx::Error> {
+    sqlx::query(
+        "UPDATE users SET username = ?, email = ? WHERE id = ?"
+    )
+    .bind(&updated_user.username)
+    .bind(&updated_user.email)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    // Fetch the updated user
+    let user = sqlx::query_as::<_, User>(
+        "SELECT id, username, email FROM users WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(user)
+}
+
+
 pub async fn delete_user_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM users WHERE id = ?")
         .bind(id)
