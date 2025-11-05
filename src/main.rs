@@ -2,9 +2,10 @@ mod api;
 mod db;
 mod models;
 
-use axum::{routing::get, Router};
+use axum::Router;
 use std::net::SocketAddr;
-use axum::Server; // Works for axum 0.6
+use db::connection::establish_connection;
+use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
 // Basic root handler
 async fn root() -> &'static str {
@@ -13,24 +14,26 @@ async fn root() -> &'static str {
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok(); // Load .env variables (like DATABASE_URL)
+    
+    let pool = establish_connection().await;
 
-    // Database connection
-    let pool = db::connection::establish_connection().await;
-    db::connection::init_db(&pool).await.expect("Failed to initialize database");
+    //println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
 
-    println!("Database connected successfully!");
+    // Quick debug: check users table
+    //let rows: Result<Vec<(i64, String, String)>, sqlx::Error> = 
+    //sqlx::query_as("SELECT id, username, email FROM users")
+    //    .fetch_all(&pool)
+    //    .await;
 
-    // Create router with root route and merge API routes
-    let app = Router::new()
-        .route("/", get(root))
-        .merge(api::create_api_router());
+    //println!("Rows fetched: {:?}", rows);
 
-    // Localhost
+    let app = api::routes::create_api_router().with_state(pool.clone());
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("GymBuddy API running at http://{}", addr);
 
-    // Start Axum 0.6 server
-    Server::bind(&addr)
+    axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
