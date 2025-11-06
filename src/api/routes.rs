@@ -8,6 +8,8 @@ use sqlx::SqlitePool;
 use crate::models::user::User;
 use crate::db::connection::{get_all_users,create_user_db, update_user_db, delete_user_db};
 use crate::models::user::{NewUser};
+use crate::db::connection::{get_all_workouts, get_all_exercises};
+use crate::models::{workout::Workout, exercise::Exercise};
 use sqlx::query_as;
 
 #[derive(Serialize)]
@@ -64,6 +66,19 @@ pub async fn delete_user(
         Err(e) => Json(format!("Failed to delete user: {:?}", e)),
     }
 }
+
+// GET all workouts
+pub async fn list_workouts(State(pool): State<SqlitePool>) -> Json<Vec<Workout>> {
+    let workouts = get_all_workouts(&pool).await.unwrap_or_default();
+    Json(workouts)
+}
+
+// GET all exercises
+pub async fn list_exercises(State(pool): State<SqlitePool>) -> Json<Vec<Exercise>> {
+    let exercises = get_all_exercises(&pool).await.unwrap_or_default();
+    Json(exercises)
+}
+
 // Health check
 async fn health_check() -> Json<HealthResponse> {
     Json(HealthResponse {
@@ -76,6 +91,7 @@ async fn health_check() -> Json<HealthResponse> {
 pub fn create_api_router() -> Router<SqlitePool> {
     Router::new()
         .route("/api/users", get(list_users).post(create_user))
-        .route("/api/users/:id", put(update_user).delete(delete_user))
+        .route("/api/workouts", get(list_workouts))
+        .route("/api/exercises", get(list_exercises))
         .route("/health", get(health_check))
 }

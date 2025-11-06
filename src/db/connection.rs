@@ -1,5 +1,5 @@
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool, FromRow};
-use crate::models::user::{User, NewUser};
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use crate::models::{user::{User, NewUser}, workout::Workout, exercise::Exercise};
 
 pub async fn establish_connection() -> SqlitePool {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -10,17 +10,51 @@ pub async fn establish_connection() -> SqlitePool {
 }
 
 pub async fn init_db(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    // Create users table
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS users (
+        "
+        CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
             email TEXT NOT NULL
-        )",
+        );
+        ",
     )
     .execute(pool)
     .await?;
+
+    // Create workouts table
+    sqlx::query(
+        "
+        CREATE TABLE IF NOT EXISTS workouts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        ",
+    )
+    .execute(pool)
+    .await?;
+
+    // Create exercises table
+    sqlx::query(
+        "
+        CREATE TABLE IF NOT EXISTS exercises (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            muscle_group TEXT NOT NULL,
+            description TEXT
+        );
+        ",
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
+
 pub async fn get_all_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> {
     let users = sqlx::query_as::<_, User>(
         "SELECT id, username, email FROM users"
@@ -85,4 +119,67 @@ pub async fn delete_user_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Erro
     Ok(())
 }
 
+// WORKOUTS CRUD 
+pub async fn get_all_workouts(pool: &SqlitePool) -> Result<Vec<Workout>, sqlx::Error> {
+    let workouts = sqlx::query_as::<_, Workout>(
+        "SELECT id, user_id, date, notes FROM workouts"
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(workouts)
+}
+
+pub async fn create_workout_db(pool: &SqlitePool, workout: &Workout) -> Result<Workout, sqlx::Error> {
+    let result = sqlx::query(
+        "INSERT INTO workouts (user_id, date, notes) VALUES (?, ?, ?)"
+    )
+    .bind(workout.user_id)
+    .bind(&workout.date)
+    .bind(&workout.notes)
+    .execute(pool)
+    .await?;
+
+    let last_id = result.last_insert_rowid();
+
+    let new_workout = sqlx::query_as::<_, Workout>(
+        "SELECT id, user_id, date, notes FROM workouts WHERE id = ?"
+    )
+    .bind(last_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(new_workout)
+}
+
+// EXERCISES CRUD 
+pub async fn get_all_exercises(pool: &SqlitePool) -> Result<Vec<Exercise>, sqlx::Error> {
+    let exercises = sqlx::query_as::<_, Exercise>(
+        "SELECT id, name, muscle_group, description FROM exercises"
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(exercises)
+}
+
+pub async fn create_exercise_db(pool: &SqlitePool, exercise: &Exercise) -> Result<Exercise, sqlx::Error> {
+    let result = sqlx::query(
+        "INSERT INTO exercises (name, muscle_group, description) VALUES (?, ?, ?)"
+    )
+    .bind(&exercise.name)
+    .bind(&exercise.muscle_group)
+    .bind(&exercise.description)
+    .execute(pool)
+    .await?;
+
+    let last_id = result.last_insert_rowid();
+
+    let new_exercise = sqlx::query_as::<_, Exercise>(
+        "SELECT id, name, muscle_group, description FROM exercises WHERE id = ?"
+    )
+    .bind(last_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(new_exercise)
+}
 
