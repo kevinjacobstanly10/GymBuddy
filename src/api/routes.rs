@@ -11,6 +11,7 @@ use crate::models::{
     user::{User, NewUser},
     workout::{Workout, NewWorkout},
     exercise::{Exercise, NewExercise},
+    workout_entry::{WorkoutEntry, NewWorkoutEntry},
 };
 
 #[derive(Serialize)]
@@ -121,15 +122,58 @@ pub async fn get_exercise(State(pool): State<SqlitePool>, Path(id): Path<i64>) -
     Json(exercise)
 }
 
-pub async fn create_exercise(State(pool): State<SqlitePool>, Json(new_exercise): Json<NewExercise>) -> Json<Exercise> {
-    let exercise = create_exercise_db(&pool, &new_exercise).await.expect("Failed to create exercise");
-    Json(exercise)
-}
+// POST: add single or multiple exercises
+pub async fn create_exercise(
+    State(pool): State<SqlitePool>,
+    Json(exercises): Json<Vec<NewExercise>>, // <-- accepts an array now
+) -> Json<Vec<Exercise>> {
+    let mut inserted = Vec::new();
 
+    for new_exercise in exercises {
+        match create_exercise_db(&pool, &new_exercise).await {
+            Ok(ex) => inserted.push(ex),
+            Err(e) => eprintln!("Error inserting exercise: {:?}", e),
+        }
+    }
+
+    Json(inserted)
+}
 pub async fn delete_exercise(State(pool): State<SqlitePool>, Path(id): Path<i64>) -> Json<String> {
     match delete_exercise_db(&pool, id).await {
         Ok(_) => Json(format!("Exercise with id {} deleted", id)),
         Err(e) => Json(format!("Failed to delete exercise: {:?}", e)),
+    }
+}
+
+// ---------------- WORKOUT ENTRIES ----------------
+
+pub async fn list_workout_entries(State(pool): State<SqlitePool>) -> Json<Vec<WorkoutEntry>> {
+    match get_all_workout_entries(&pool).await {
+        Ok(entries) => Json(entries),
+        Err(e) => {
+            eprintln!("Error fetching workout entries: {:?}", e);
+            Json(vec![])
+        }
+    }
+}
+
+pub async fn create_workout_entry(
+    State(pool): State<SqlitePool>,
+    Json(new_entry): Json<NewWorkoutEntry>,
+) -> Json<WorkoutEntry> {
+    let entry = create_workout_entry_db(&pool, &new_entry)
+        .await
+        .expect("Failed to create workout entry");
+    Json(entry)
+}
+
+pub async fn delete_workout_entry(
+    Path(id): Path<i64>,
+    State(pool): State<SqlitePool>,
+) -> Json<String> {
+    match delete_workout_entry_db(&pool, id).await {
+        Ok(_) => Json(format!("Workout entry with id {} deleted", id)),
+        Err(e) => Json(format!("Failed to delete workout entry: {:?}", e)),
     }
 }
 
@@ -163,9 +207,6 @@ pub async fn get_workout_by_id_route(
     }
 }
 
-// DELETE workout
-
-
 // ---------------- ROUTER SETUP ----------------
 
 pub fn create_api_router() -> Router<SqlitePool> {
@@ -178,6 +219,9 @@ pub fn create_api_router() -> Router<SqlitePool> {
         .route("/api/workouts/:id", get(get_workout_by_id_route).delete(delete_workout))
         // Exercises
         .route("/api/exercises", get(list_exercises).post(create_exercise))
+        // Workout Entries
+        .route("/api/workout_entries", get(list_workout_entries).post(create_workout_entry))
+        .route("/api/workout_entries/:id", delete(delete_workout_entry))
         // Health check
         .route("/health", get(health_check))
 }

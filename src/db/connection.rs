@@ -3,7 +3,9 @@ use crate::models::{
     user::{NewUser, User},
     workout::{Workout, NewWorkout},
     exercise::{Exercise, NewExercise},
+    workout_entry::{WorkoutEntry, NewWorkoutEntry},
 };
+
 
 
 pub async fn establish_connection() -> SqlitePool {
@@ -215,6 +217,7 @@ pub async fn create_exercise_db(
     .bind(&exercise.description)
     .execute(pool)
     .await?;
+
     let last_id = result.last_insert_rowid();
 
     let new_exercise = sqlx::query_as::<_, Exercise>(
@@ -223,6 +226,7 @@ pub async fn create_exercise_db(
     .bind(last_id)
     .fetch_one(pool)
     .await?;
+
     Ok(new_exercise)
 }
 
@@ -254,4 +258,47 @@ pub async fn get_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, sqlx::
     .fetch_optional(pool)
     .await?;
     Ok(user)
+}
+
+// WORKOUT ENTRIES CRUD
+
+pub async fn get_all_workout_entries(pool: &SqlitePool) -> Result<Vec<WorkoutEntry>, sqlx::Error> {
+    let entries = sqlx::query_as::<_, WorkoutEntry>(
+        "SELECT id, workout_id, exercise_id, sets, reps, weight FROM workout_entries"
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(entries)
+}
+
+pub async fn create_workout_entry_db(pool: &SqlitePool, entry: &NewWorkoutEntry) -> Result<WorkoutEntry, sqlx::Error> {
+    let result = sqlx::query(
+        "INSERT INTO workout_entries (workout_id, exercise_id, sets, reps, weight) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind(entry.workout_id)
+    .bind(entry.exercise_id)
+    .bind(entry.sets)
+    .bind(entry.reps)
+    .bind(entry.weight)
+    .execute(pool)
+    .await?;
+
+    let last_id = result.last_insert_rowid();
+
+    let new_entry = sqlx::query_as::<_, WorkoutEntry>(
+        "SELECT id, workout_id, exercise_id, sets, reps, weight FROM workout_entries WHERE id = ?"
+    )
+    .bind(last_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(new_entry)
+}
+
+pub async fn delete_workout_entry_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM workout_entries WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
