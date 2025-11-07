@@ -244,6 +244,17 @@ pub async fn get_entries_for_workout(
     }
 }
 
+pub async fn get_workout_summary_route(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
+) -> Json<serde_json::Value> {
+    let summary = get_workout_summary(&pool, id)
+        .await
+        .expect("Failed to fetch workout summary");
+    Json(summary)
+}
+
+
 // ---------------- ROUTER SETUP ----------------
 
 pub fn create_api_router() -> Router<SqlitePool> {
@@ -260,6 +271,8 @@ pub fn create_api_router() -> Router<SqlitePool> {
         // Workout Entries
         .route("/api/workout_entries", get(list_workout_entries_detailed).post(create_workout_entry))
         .route("/api/workout_entries/:id", put(update_workout_entry).delete(delete_workout_entry))
+        //Workout Summary
+        .route("/api/workouts/:id/summary", get(get_workout_summary_route))
         // Health check
         .route("/health", get(health_check))
 }

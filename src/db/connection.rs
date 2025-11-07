@@ -399,3 +399,55 @@ pub async fn get_workout_entries_by_workout_id(
 
     Ok(entries)
 }
+
+// For summary, total volume, most muscle group trained
+pub async fn get_workout_summary(
+    pool: &SqlitePool,
+    workout_id: i64,
+) -> Result<serde_json::Value, sqlx::Error> {
+    let entries = sqlx::query!(
+        "
+        SELECT e.name, we.sets, we.reps, we.weight
+        FROM workout_entries we
+        JOIN exercises e ON we.exercise_id = e.id
+        WHERE we.workout_id = ?
+        ",
+        workout_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut total_sets = 0;
+    let mut total_reps = 0;
+    let mut total_volume = 0.0;
+
+    let exercises: Vec<_> = entries
+        .into_iter()
+        .map(|row| {
+            let sets = row.sets;
+            let reps = row.reps;
+            let weight = row.weight.unwrap_or(0.0);
+            let volume = sets as f64 * reps as f64 * weight;
+
+            total_sets += sets;
+            total_reps += reps;
+            total_volume += volume;
+
+            serde_json::json!({
+                "name": row.name,
+                "sets": sets,
+                "reps": reps,
+                "weight": weight,
+                "volume": volume
+            })
+        })
+        .collect();
+
+    Ok(serde_json::json!({
+        "workout_id": workout_id,
+        "total_sets": total_sets,
+        "total_reps": total_reps,
+        "total_volume": total_volume,
+        "exercises": exercises
+    }))
+}
