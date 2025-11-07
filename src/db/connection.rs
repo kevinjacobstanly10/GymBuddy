@@ -262,6 +262,7 @@ pub async fn get_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, sqlx::
 
 // WORKOUT ENTRIES CRUD
 
+// Get all workout entries
 pub async fn get_all_workout_entries(pool: &SqlitePool) -> Result<Vec<WorkoutEntry>, sqlx::Error> {
     let entries = sqlx::query_as::<_, WorkoutEntry>(
         "SELECT id, workout_id, exercise_id, sets, reps, weight FROM workout_entries"
@@ -271,30 +272,36 @@ pub async fn get_all_workout_entries(pool: &SqlitePool) -> Result<Vec<WorkoutEnt
     Ok(entries)
 }
 
-pub async fn create_workout_entry_db(pool: &SqlitePool, entry: &NewWorkoutEntry) -> Result<WorkoutEntry, sqlx::Error> {
+// Create new workout entry
+pub async fn create_workout_entry_db(
+    pool: &SqlitePool,
+    new_entry: &NewWorkoutEntry,
+) -> Result<WorkoutEntry, sqlx::Error> {
     let result = sqlx::query(
-        "INSERT INTO workout_entries (workout_id, exercise_id, sets, reps, weight) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO workout_entries (workout_id, exercise_id, sets, reps, weight)
+         VALUES (?, ?, ?, ?, ?)"
     )
-    .bind(entry.workout_id)
-    .bind(entry.exercise_id)
-    .bind(entry.sets)
-    .bind(entry.reps)
-    .bind(entry.weight)
+    .bind(new_entry.workout_id)
+    .bind(new_entry.exercise_id)
+    .bind(new_entry.sets)
+    .bind(new_entry.reps)
+    .bind(new_entry.weight)
     .execute(pool)
     .await?;
 
     let last_id = result.last_insert_rowid();
 
-    let new_entry = sqlx::query_as::<_, WorkoutEntry>(
+    let entry = sqlx::query_as::<_, WorkoutEntry>(
         "SELECT id, workout_id, exercise_id, sets, reps, weight FROM workout_entries WHERE id = ?"
     )
     .bind(last_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(new_entry)
+    Ok(entry)
 }
 
+// Delete a workout entry
 pub async fn delete_workout_entry_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM workout_entries WHERE id = ?")
         .bind(id)

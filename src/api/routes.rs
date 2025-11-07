@@ -151,7 +151,7 @@ pub async fn list_workout_entries(State(pool): State<SqlitePool>) -> Json<Vec<Wo
     match get_all_workout_entries(&pool).await {
         Ok(entries) => Json(entries),
         Err(e) => {
-            eprintln!("Error fetching workout entries: {:?}", e);
+            eprintln!("Error fetching entries: {:?}", e);
             Json(vec![])
         }
     }
@@ -163,13 +163,13 @@ pub async fn create_workout_entry(
 ) -> Json<WorkoutEntry> {
     let entry = create_workout_entry_db(&pool, &new_entry)
         .await
-        .expect("Failed to create workout entry");
+        .expect("Failed to insert workout entry");
     Json(entry)
 }
 
 pub async fn delete_workout_entry(
-    Path(id): Path<i64>,
     State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
 ) -> Json<String> {
     match delete_workout_entry_db(&pool, id).await {
         Ok(_) => Json(format!("Workout entry with id {} deleted", id)),

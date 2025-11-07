@@ -8,7 +8,7 @@ pub struct WorkoutEntry {
     pub exercise_id: i64,
     pub sets: i32,
     pub reps: i32,
-    pub weight: Option<f32>, // Just in case bodyweight exercise
+    pub weight: Option<f32>,
 }
 
 #[derive(Deserialize, Debug)]
