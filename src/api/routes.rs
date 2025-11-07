@@ -11,7 +11,7 @@ use crate::models::{
     user::{User, NewUser},
     workout::{Workout, NewWorkout},
     exercise::{Exercise, NewExercise},
-    workout_entry::{WorkoutEntry, NewWorkoutEntry},
+    workout_entry::{WorkoutEntry, NewWorkoutEntry, WorkoutEntryDetailed},
 };
 
 #[derive(Serialize)]
@@ -145,6 +145,17 @@ pub async fn delete_exercise(State(pool): State<SqlitePool>, Path(id): Path<i64>
     }
 }
 
+pub async fn update_workout_entry(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
+    Json(updated_entry): Json<NewWorkoutEntry>,
+) -> Json<WorkoutEntry> {
+    let entry = update_workout_entry_db(&pool, id, &updated_entry)
+        .await
+        .expect("Failed to update workout entry");
+    Json(entry)
+}
+
 // ---------------- WORKOUT ENTRIES ----------------
 
 pub async fn list_workout_entries(State(pool): State<SqlitePool>) -> Json<Vec<WorkoutEntry>> {
@@ -207,6 +218,32 @@ pub async fn get_workout_by_id_route(
     }
 }
 
+// To get more detailed info of workout (name, muscle group, etc)
+pub async fn list_workout_entries_detailed(
+    State(pool): State<SqlitePool>,
+) -> Json<Vec<WorkoutEntryDetailed>> {
+    match get_detailed_workout_entries(&pool).await {
+        Ok(entries) => Json(entries),
+        Err(e) => {
+            eprintln!("Error fetching detailed entries: {:?}", e);
+            Json(vec![])
+        }
+    }
+}
+
+pub async fn get_entries_for_workout(
+    State(pool): State<SqlitePool>,
+    Path(workout_id): Path<i64>,
+) -> Json<Vec<WorkoutEntryDetailed>> {
+    match get_workout_entries_by_workout_id(&pool, workout_id).await {
+        Ok(entries) => Json(entries),
+        Err(e) => {
+            eprintln!("Error fetching entries for workout {}: {:?}", workout_id, e);
+            Json(vec![])
+        }
+    }
+}
+
 // ---------------- ROUTER SETUP ----------------
 
 pub fn create_api_router() -> Router<SqlitePool> {
@@ -217,11 +254,12 @@ pub fn create_api_router() -> Router<SqlitePool> {
         // Workouts
         .route("/api/workouts", get(list_workouts).post(create_workout))
         .route("/api/workouts/:id", get(get_workout_by_id_route).delete(delete_workout))
+        .route("/api/workouts/:id/entries", get(get_entries_for_workout))
         // Exercises
         .route("/api/exercises", get(list_exercises).post(create_exercise))
         // Workout Entries
-        .route("/api/workout_entries", get(list_workout_entries).post(create_workout_entry))
-        .route("/api/workout_entries/:id", delete(delete_workout_entry))
+        .route("/api/workout_entries", get(list_workout_entries_detailed).post(create_workout_entry))
+        .route("/api/workout_entries/:id", put(update_workout_entry).delete(delete_workout_entry))
         // Health check
         .route("/health", get(health_check))
 }

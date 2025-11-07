@@ -3,7 +3,7 @@ use crate::models::{
     user::{NewUser, User},
     workout::{Workout, NewWorkout},
     exercise::{Exercise, NewExercise},
-    workout_entry::{WorkoutEntry, NewWorkoutEntry},
+    workout_entry::{WorkoutEntry, NewWorkoutEntry, WorkoutEntryDetailed},
 };
 
 
@@ -238,6 +238,42 @@ pub async fn delete_exercise_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::
     Ok(())
 }
 
+pub async fn update_workout_entry_db(
+    pool: &SqlitePool,
+    id: i64,
+    updated_entry: &NewWorkoutEntry,
+) -> Result<WorkoutEntry, sqlx::Error> {
+    sqlx::query(
+        "
+        UPDATE workout_entries 
+        SET workout_id = ?, exercise_id = ?, sets = ?, reps = ?, weight = ?
+        WHERE id = ?
+        ",
+    )
+    .bind(updated_entry.workout_id)
+    .bind(updated_entry.exercise_id)
+    .bind(updated_entry.sets)
+    .bind(updated_entry.reps)
+    .bind(updated_entry.weight)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    // Fetch the updated record
+    let updated = sqlx::query_as::<_, WorkoutEntry>(
+        "
+        SELECT id, workout_id, exercise_id, sets, reps, weight
+        FROM workout_entries
+        WHERE id = ?
+        ",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(updated)
+}
+
 // Get a single workout by ID
 pub async fn get_workout_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Workout>, sqlx::Error> {
     let workout = sqlx::query_as::<_, Workout>(
@@ -308,4 +344,58 @@ pub async fn delete_workout_entry_db(pool: &SqlitePool, id: i64) -> Result<(), s
         .execute(pool)
         .await?;
     Ok(())
+}
+
+// Get all entries with exercise info
+pub async fn get_detailed_workout_entries(
+    pool: &SqlitePool,
+) -> Result<Vec<WorkoutEntryDetailed>, sqlx::Error> {
+    let entries = sqlx::query_as::<_, WorkoutEntryDetailed>(
+        "
+        SELECT 
+            we.id,
+            we.workout_id,
+            we.exercise_id,
+            e.name AS exercise_name,
+            e.muscle_group AS muscle_group,
+            we.sets,
+            we.reps,
+            we.weight
+        FROM workout_entries we
+        JOIN exercises e ON we.exercise_id = e.id
+        ORDER BY we.workout_id;
+        "
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(entries)
+}
+
+pub async fn get_workout_entries_by_workout_id(
+    pool: &SqlitePool,
+    workout_id: i64,
+) -> Result<Vec<WorkoutEntryDetailed>, sqlx::Error> {
+    let entries = sqlx::query_as::<_, WorkoutEntryDetailed>(
+        "
+        SELECT 
+            we.id,
+            we.workout_id,
+            we.exercise_id,
+            e.name AS exercise_name,
+            e.muscle_group AS muscle_group,
+            we.sets,
+            we.reps,
+            we.weight
+        FROM workout_entries we
+        JOIN exercises e ON we.exercise_id = e.id
+        WHERE we.workout_id = ?
+        ORDER BY we.id;
+        "
+    )
+    .bind(workout_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(entries)
 }
