@@ -178,6 +178,17 @@ pub async fn create_workout_entry(
     Json(entry)
 }
 
+pub async fn update_workout(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
+    Json(updated_workout): Json<NewWorkout>,
+) -> Json<Workout> {
+    let workout = update_workout_db(&pool, id, &updated_workout)
+        .await
+        .expect("Failed to update workout");
+    Json(workout)
+}
+
 pub async fn delete_workout_entry(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -244,6 +255,7 @@ pub async fn get_entries_for_workout(
     }
 }
 
+// Summary report route
 pub async fn get_workout_summary_route(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -255,6 +267,18 @@ pub async fn get_workout_summary_route(
 }
 
 
+
+// Overall progress route
+pub async fn get_user_progress_route(
+    State(pool): State<SqlitePool>,
+    Path(user_id): Path<i64>,
+) -> Json<serde_json::Value> {
+    let progress = get_workout_progress(&pool, user_id)
+        .await
+        .expect("Failed to fetch user progress");
+    Json(progress)
+}
+
 // ---------------- ROUTER SETUP ----------------
 
 pub fn create_api_router() -> Router<SqlitePool> {
@@ -264,7 +288,7 @@ pub fn create_api_router() -> Router<SqlitePool> {
         .route("/api/users/:id", get(get_user_by_id))
         // Workouts
         .route("/api/workouts", get(list_workouts).post(create_workout))
-        .route("/api/workouts/:id", get(get_workout_by_id_route).delete(delete_workout))
+        .route("/api/workouts/:id", get(get_workout_by_id_route).put(update_workout).delete(delete_workout))
         .route("/api/workouts/:id/entries", get(get_entries_for_workout))
         // Exercises
         .route("/api/exercises", get(list_exercises).post(create_exercise))
@@ -273,6 +297,8 @@ pub fn create_api_router() -> Router<SqlitePool> {
         .route("/api/workout_entries/:id", put(update_workout_entry).delete(delete_workout_entry))
         //Workout Summary
         .route("/api/workouts/:id/summary", get(get_workout_summary_route))
+        // User progress tracking
+        .route("/api/users/:id/progress", get(get_user_progress_route))
         // Health check
         .route("/health", get(health_check))
 }

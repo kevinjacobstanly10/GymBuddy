@@ -337,6 +337,31 @@ pub async fn create_workout_entry_db(
     Ok(entry)
 }
 
+pub async fn update_workout_db(
+    pool: &SqlitePool,
+    id: i64,
+    updated_workout: &NewWorkout,
+) -> Result<Workout, sqlx::Error> {
+    sqlx::query(
+        "UPDATE workouts SET user_id = ?, date = ?, notes = ? WHERE id = ?"
+    )
+    .bind(updated_workout.user_id)
+    .bind(&updated_workout.date)
+    .bind(&updated_workout.notes)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    let workout = sqlx::query_as::<_, Workout>(
+        "SELECT id, user_id, date, notes FROM workouts WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(workout)
+}
+
 // Delete a workout entry
 pub async fn delete_workout_entry_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM workout_entries WHERE id = ?")
@@ -400,6 +425,71 @@ pub async fn get_workout_entries_by_workout_id(
     Ok(entries)
 }
 
+// Calculates per-muscle-group volume and top exercises
+pub async fn get_workout_progress(pool: &SqlitePool, user_id: i64) -> Result<serde_json::Value, sqlx::Error> {
+    let workouts = sqlx::query!(
+        "SELECT id, date FROM workouts WHERE user_id = ?",
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut progress = Vec::new();
+
+    for workout in workouts {
+        let entries = sqlx::query!(
+            "
+            SELECT e.name, e.muscle_group, we.sets, we.reps, we.weight
+            FROM workout_entries we
+            JOIN exercises e ON we.exercise_id = e.id
+            WHERE we.workout_id = ?
+            ",
+            workout.id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let mut total_sets = 0;
+        let mut total_reps = 0;
+        let mut total_volume = 0.0;
+        let mut muscle_groups = std::collections::HashMap::new();
+        let mut top_exercises = Vec::new();
+
+        for row in entries {
+            let sets = row.sets;
+            let reps = row.reps;
+            let weight = row.weight.unwrap_or(0.0);
+            let volume = sets as f64 * reps as f64 * weight;
+
+            total_sets += sets;
+            total_reps += reps;
+            total_volume += volume;
+
+            *muscle_groups.entry(row.muscle_group.clone()).or_insert(0.0) += volume;
+
+            top_exercises.push(serde_json::json!({
+                "name": row.name,
+                "volume": volume
+            }));
+        }
+
+        // Sort top exercises by volume descending
+        top_exercises.sort_by(|a, b| b["volume"].as_f64().partial_cmp(&a["volume"].as_f64()).unwrap());
+
+        progress.push(serde_json::json!({
+            "workout_id": workout.id,
+            "date": workout.date,
+            "total_sets": total_sets,
+            "total_reps": total_reps,
+            "total_volume": total_volume,
+            "muscle_groups": muscle_groups,
+            "top_exercises": top_exercises
+        }));
+    }
+
+    Ok(serde_json::json!(progress))
+}
+
 // For summary, total volume, most muscle group trained
 pub async fn get_workout_summary(
     pool: &SqlitePool,
@@ -450,4 +540,34 @@ pub async fn get_workout_summary(
         "total_volume": total_volume,
         "exercises": exercises
     }))
+}
+
+// Overall progress
+pub async fn get_user_progress(
+    pool: &SqlitePool,
+    user_id: i64,
+) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+    // Get all workouts for the user
+    let workouts = sqlx::query!(
+        "SELECT id, date FROM workouts WHERE user_id = ? ORDER BY date ASC",
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut progress = Vec::new();
+
+    for workout in workouts {
+        // Reuse the summary function logic per workout
+        let summary = get_workout_summary(pool, workout.id).await?;
+        progress.push(serde_json::json!({
+            "workout_id": workout.id,
+            "date": workout.date,
+            "total_sets": summary["total_sets"],
+            "total_reps": summary["total_reps"],
+            "total_volume": summary["total_volume"]
+        }));
+    }
+
+    Ok(progress)
 }
