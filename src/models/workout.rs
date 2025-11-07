@@ -8,3 +8,11 @@ pub struct Workout {
     pub date: String,
     pub notes: Option<String>,
 }
+
+// Your existing NewWorkout
+#[derive(Deserialize, Debug)]
+pub struct NewWorkout {
+    pub user_id: i64,
+    pub date: String,
+    pub notes: Option<String>,
+}

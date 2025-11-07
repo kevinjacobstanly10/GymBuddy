@@ -8,3 +8,10 @@ pub struct Exercise {
     pub muscle_group: String,
     pub description: Option<String>,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct NewExercise {
+    pub name: String,
+    pub muscle_group: String,
+    pub description: Option<String>,
+}

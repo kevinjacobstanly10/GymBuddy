@@ -14,23 +14,18 @@ async fn root() -> &'static str {
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().ok(); // Load .env variables (like DATABASE_URL)
-    
+    dotenvy::dotenv().ok();
+
     let pool = establish_connection().await;
 
-    //println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
-
-    // Quick debug: check users table
-    //let rows: Result<Vec<(i64, String, String)>, sqlx::Error> = 
-    //sqlx::query_as("SELECT id, username, email FROM users")
-    //    .fetch_all(&pool)
-    //    .await;
-
-    //println!("Rows fetched: {:?}", rows);
+    // Initialize database tables
+    db::connection::init_db(&pool)
+        .await
+        .expect("Failed to initialize database tables");
 
     let app = api::routes::create_api_router().with_state(pool.clone());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("GymBuddy API running at http://{}", addr);
 
     axum::Server::bind(&addr)
