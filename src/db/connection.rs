@@ -1,4 +1,6 @@
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use sqlx::Row; 
+use crate::auth::{hash_password, verify_password};
 use crate::models::{
     user::{NewUser, User},
     workout::{Workout, NewWorkout},
@@ -19,17 +21,17 @@ pub async fn establish_connection() -> SqlitePool {
 pub async fn init_db(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     // Create users table
     sqlx::query(
-        "
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            email TEXT NOT NULL
-        );
-        ",
+    "
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password_hash TEXT NOT NULL
+    );
+    "
     )
     .execute(pool)
     .await?;
-
     // Create workouts table
     sqlx::query(
         "
@@ -91,23 +93,23 @@ pub async fn get_all_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> 
 }
 
 pub async fn create_user_db(pool: &SqlitePool, new_user: &NewUser) -> Result<User, sqlx::Error> {
-    // Step 1: Insert the user
+    let hashed = hash_password(&new_user.password);
+
     let result = sqlx::query(
-        "INSERT INTO users (username, email) VALUES (?, ?)"
+        "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)"
     )
     .bind(&new_user.username)
     .bind(&new_user.email)
+    .bind(hashed)
     .execute(pool)
     .await?;
 
-    // Step 2: Get the last inserted row ID
-    let last_id = result.last_insert_rowid();
+    let id = result.last_insert_rowid();
 
-    // Step 3: Fetch the user row
     let user = sqlx::query_as::<_, User>(
         "SELECT id, username, email FROM users WHERE id = ?"
     )
-    .bind(last_id)
+    .bind(id)
     .fetch_one(pool)
     .await?;
 
@@ -426,26 +428,30 @@ pub async fn get_workout_entries_by_workout_id(
 }
 
 // Calculates per-muscle-group volume and top exercises
-pub async fn get_workout_progress(pool: &SqlitePool, user_id: i64) -> Result<serde_json::Value, sqlx::Error> {
-    let workouts = sqlx::query!(
-        "SELECT id, date FROM workouts WHERE user_id = ?",
-        user_id
+pub async fn get_workout_progress(
+    pool: &SqlitePool,
+    user_id: i64,
+) -> Result<serde_json::Value, sqlx::Error> {
+
+    let workouts = sqlx::query(
+        "SELECT id, date FROM workouts WHERE user_id = ?"
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
 
     let mut progress = Vec::new();
 
     for workout in workouts {
-        let entries = sqlx::query!(
+        let entries = sqlx::query(
             "
             SELECT e.name, e.muscle_group, we.sets, we.reps, we.weight
             FROM workout_entries we
             JOIN exercises e ON we.exercise_id = e.id
             WHERE we.workout_id = ?
-            ",
-            workout.id
+            "
         )
+        .bind(workout.get::<i64, _>("id"))
         .fetch_all(pool)
         .await?;
 
@@ -456,29 +462,36 @@ pub async fn get_workout_progress(pool: &SqlitePool, user_id: i64) -> Result<ser
         let mut top_exercises = Vec::new();
 
         for row in entries {
-            let sets = row.sets;
-            let reps = row.reps;
-            let weight = row.weight.unwrap_or(0.0);
+            let sets: i32 = row.get("sets");
+            let reps: i32 = row.get("reps");
+            let weight: f64 = row.get::<Option<f64>, _>("weight").unwrap_or(0.0);
+            let name: String = row.get("name");
+            let mg: String = row.get("muscle_group");
+
             let volume = sets as f64 * reps as f64 * weight;
 
             total_sets += sets;
             total_reps += reps;
             total_volume += volume;
 
-            *muscle_groups.entry(row.muscle_group.clone()).or_insert(0.0) += volume;
+            *muscle_groups.entry(mg.clone()).or_insert(0.0) += volume;
 
             top_exercises.push(serde_json::json!({
-                "name": row.name,
+                "name": name,
                 "volume": volume
             }));
         }
 
-        // Sort top exercises by volume descending
-        top_exercises.sort_by(|a, b| b["volume"].as_f64().partial_cmp(&a["volume"].as_f64()).unwrap());
+        top_exercises.sort_by(|a, b| {
+            b["volume"].as_f64()
+                .unwrap()
+                .partial_cmp(&a["volume"].as_f64().unwrap())
+                .unwrap()
+        });
 
         progress.push(serde_json::json!({
-            "workout_id": workout.id,
-            "date": workout.date,
+            "workout_id": workout.get::<i64, _>("id"),
+            "date": workout.get::<String, _>("date"),
             "total_sets": total_sets,
             "total_reps": total_reps,
             "total_volume": total_volume,
@@ -489,21 +502,21 @@ pub async fn get_workout_progress(pool: &SqlitePool, user_id: i64) -> Result<ser
 
     Ok(serde_json::json!(progress))
 }
-
 // For summary, total volume, most muscle group trained
 pub async fn get_workout_summary(
     pool: &SqlitePool,
     workout_id: i64,
 ) -> Result<serde_json::Value, sqlx::Error> {
-    let entries = sqlx::query!(
+
+    let entries = sqlx::query(
         "
         SELECT e.name, we.sets, we.reps, we.weight
         FROM workout_entries we
         JOIN exercises e ON we.exercise_id = e.id
         WHERE we.workout_id = ?
-        ",
-        workout_id
+        "
     )
+    .bind(workout_id)
     .fetch_all(pool)
     .await?;
 
@@ -514,9 +527,11 @@ pub async fn get_workout_summary(
     let exercises: Vec<_> = entries
         .into_iter()
         .map(|row| {
-            let sets = row.sets;
-            let reps = row.reps;
-            let weight = row.weight.unwrap_or(0.0);
+            let sets: i32 = row.get("sets");
+            let reps: i32 = row.get("reps");
+            let weight: f64 = row.get::<Option<f64>, _>("weight").unwrap_or(0.0);
+            let name: String = row.get("name");
+
             let volume = sets as f64 * reps as f64 * weight;
 
             total_sets += sets;
@@ -524,7 +539,7 @@ pub async fn get_workout_summary(
             total_volume += volume;
 
             serde_json::json!({
-                "name": row.name,
+                "name": name,
                 "sets": sets,
                 "reps": reps,
                 "weight": weight,
@@ -547,22 +562,25 @@ pub async fn get_user_progress(
     pool: &SqlitePool,
     user_id: i64,
 ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
-    // Get all workouts for the user
-    let workouts = sqlx::query!(
-        "SELECT id, date FROM workouts WHERE user_id = ? ORDER BY date ASC",
-        user_id
+
+    let workouts = sqlx::query(
+        "SELECT id, date FROM workouts WHERE user_id = ? ORDER BY date ASC"
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
 
     let mut progress = Vec::new();
 
     for workout in workouts {
-        // Reuse the summary function logic per workout
-        let summary = get_workout_summary(pool, workout.id).await?;
+        let w_id = workout.get::<i64, _>("id");
+        let date = workout.get::<String, _>("date");
+
+        let summary = get_workout_summary(pool, w_id).await?;
+
         progress.push(serde_json::json!({
-            "workout_id": workout.id,
-            "date": workout.date,
+            "workout_id": w_id,
+            "date": date,
             "total_sets": summary["total_sets"],
             "total_reps": summary["total_reps"],
             "total_volume": summary["total_volume"]

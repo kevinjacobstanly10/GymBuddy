@@ -1,7 +1,8 @@
 mod api;
 mod db;
 mod models;
-
+mod auth;
+mod jwt;
 use axum::Router;
 use std::net::SocketAddr;
 use db::connection::establish_connection;

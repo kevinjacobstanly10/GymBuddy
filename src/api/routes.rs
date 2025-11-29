@@ -5,19 +5,26 @@ use axum::{
 };
 use serde::Serialize;
 use sqlx::SqlitePool;
-
 use crate::db::connection::*;
 use crate::models::{
-    user::{User, NewUser},
+    user::{User, NewUser, LoginUser},
     workout::{Workout, NewWorkout},
     exercise::{Exercise, NewExercise},
     workout_entry::{WorkoutEntry, NewWorkoutEntry, WorkoutEntryDetailed},
 };
+use crate::auth::{hash_password, verify_password};
+use crate::jwt::{generate_jwt, verify_jwt};
 
 #[derive(Serialize)]
 struct HealthResponse {
     status: String,
     message: String,
+}
+
+#[derive(sqlx::FromRow)]
+struct UserRow {
+    id: i64,
+    password_hash: String,
 }
 
 // GET: list all users
@@ -171,12 +178,20 @@ pub async fn list_workout_entries(State(pool): State<SqlitePool>) -> Json<Vec<Wo
 pub async fn create_workout_entry(
     State(pool): State<SqlitePool>,
     Json(new_entry): Json<NewWorkoutEntry>,
-) -> Json<WorkoutEntry> {
-    let entry = create_workout_entry_db(&pool, &new_entry)
-        .await
-        .expect("Failed to insert workout entry");
-    Json(entry)
+) -> Json<serde_json::Value> {
+
+    match create_workout_entry_db(&pool, &new_entry).await {
+        Ok(entry) => Json(serde_json::json!({
+            "status": "success",
+            "entry": entry
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+    }
 }
+
 
 pub async fn update_workout(
     State(pool): State<SqlitePool>,
@@ -279,6 +294,51 @@ pub async fn get_user_progress_route(
     Json(progress)
 }
 
+// POST /api/register
+pub async fn register_user(
+    State(pool): State<SqlitePool>,
+    Json(new_user): Json<NewUser>,
+) -> Json<serde_json::Value> {
+    let password_hash = hash_password(&new_user.password);
+
+    let result = sqlx::query(
+        "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)"
+    )
+    .bind(&new_user.username)
+    .bind(&new_user.email)
+    .bind(password_hash)
+    .execute(&pool)
+    .await;
+
+    match result {
+        Ok(_) => Json(serde_json::json!({"status": "success", "message": "User registered"})),
+        Err(e) => Json(serde_json::json!({"status": "error", "error": e.to_string()})),
+    }
+}
+
+pub async fn login_user(
+    State(pool): State<SqlitePool>,
+    Json(login): Json<LoginUser>,
+) -> Json<serde_json::Value> {
+    // Fetch user by email
+    let user = sqlx::query_as::<_, (i64, String)>(
+        "SELECT id, password_hash FROM users WHERE email = ?"
+    )
+    .bind(&login.email)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+
+    if let Some((id, password_hash)) = user {
+        if verify_password(&password_hash, &login.password) {
+            let token = generate_jwt(id);
+            return Json(serde_json::json!({ "token": token }));
+        }
+    }
+
+    Json(serde_json::json!({ "error": "Invalid credentials" }))
+}
+
 // ---------------- ROUTER SETUP ----------------
 
 pub fn create_api_router() -> Router<SqlitePool> {
@@ -299,6 +359,9 @@ pub fn create_api_router() -> Router<SqlitePool> {
         .route("/api/workouts/:id/summary", get(get_workout_summary_route))
         // User progress tracking
         .route("/api/users/:id/progress", get(get_user_progress_route))
+        //User register and login
+        .route("/api/register", post(register_user))
+        .route("/api/login", post(login_user))
         // Health check
         .route("/health", get(health_check))
 }
