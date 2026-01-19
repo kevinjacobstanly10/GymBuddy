@@ -1,187 +1,193 @@
-# 🏋️‍♂️ GymBuddy - Fitness Tracker API
+# 🏋️‍♂️ GymBuddy — Fitness Tracker Backend API
 
-## 📘 Overview
-**GymBuddy** is a backend API built with **Rust** and **Axum**, allowing users to manage fitness data such as workouts, muscle groups, exercises, and track progress.  
-It supports **CRUD operations for users, workouts, exercises, and workout entries**, along with analytics to summarize training performance.
+##  Overview
 
-## 🗂 API Endpoints Summary
+**GymBuddy** is a backend REST API built using **Rust** and **Axum** that allows users to log workouts, track training progress, analyze muscle group distribution, and view fitness analytics over time.
 
-**Users**
-- `GET /api/users` → Fetch all users
-- `POST /api/users` → Create a new user
-- `GET /api/users/:id` → Get a user by ID
-- `PUT /api/users/:id` → Update a user by ID
-- `DELETE /api/users/:id` → Delete a user by ID
-- `GET /api/users/:id/progress` → Get per-workout progress with volume and top exercises
+The system is designed as a **high-performance and scalable backend** intended to serve a future mobile or web fitness application. It focuses on structured data modeling, secure authentication, and efficient computation of workout analytics.
 
-**Workouts**
-- `GET /api/workouts` → List all workouts
-- `POST /api/workouts` → Create a new workout
-- `GET /api/workouts/:id` → Fetch a workout by ID
-- `DELETE /api/workouts/:id` → Delete a workout
-- `GET /api/workouts/:id/entries` → Get entries for a workout
-- `GET /api/workouts/:id/summary` → Get workout summary
+---
 
-**Exercises**
-- `GET /api/exercises` → List all exercises
-- `POST /api/exercises` → Add new exercises
+## Project Motivation
 
-**Workout Entries**
-- `GET /api/workout_entries` → List all workout entries (detailed)
-- `POST /api/workout_entries` → Create a workout entry
-- `PUT /api/workout_entries/:id` → Update a workout entry
-- `DELETE /api/workout_entries/:id` → Delete a workout entry
+GymBuddy was developed to gain experience in:
 
-## Current Progress (as of Nov 2025)
+- Backend API development
+- Secure authentication (JWT)
+- Relational data modeling
+- Analytics computation over user-generated data
+- Observability using structured logging
+- Writing unit and integration tests
 
-### Backend Setup
-- Project initialized and version-controlled on GitHub  
-- Built with **Rust + Axum** web framework  
-- Organized modular structure:
-src/
-├── api/ → route handlers (Axum)
-├── db/ → database connections & queries (SQLx)
-├── models/ → data models (User, NewUser, Workout, Exercise, WorkoutEntry)
-└── main.rs → app entry point
+Coming from a **game development background (Unity)**, this project bridges familiar concepts such as state management and performance optimization into a backend systems context. As a fitness enthusiast, GymBuddy also solves a real-world problem of accurately tracking workout history and progress beyond simple note-taking apps.
 
-- Connected to a **SQLite** database via SQLx  
-- `.env` configured with `DATABASE_URL`  
-- Health check route added at `/health`
+---
 
-## User CRUD API
-Implemented all REST endpoints for managing users:
+## User Stories (Implemented)
 
-| Method | Route | Description |
-| ------ | ----- | ----------- |
-| `GET` | `/api/users` | Fetch all users |
-| `POST` | `/api/users` | Create a new user |
-| `PUT` | `/api/users/:id` | Update user by ID |
-| `DELETE` | `/api/users/:id` | Delete user by ID |
-| `GET` | `/api/users/:id/progress` | Get per-workout progress with volume and top exercises |
+- As a user, I can **register** and **log in securely**
+- As a user, I can browse **exercises categorized by muscle groups**
+- As a user, I can **log workouts** with exercises, sets, reps, and weight
+- As a user, I can view **weekly training analytics**
+- As a user, I can view **lifetime workout history and progress summaries**
 
-**Example JSON (for POST/PUT):**
-```json
-{
-    "username": "Kevin Jacob",
-    "email": "kevin@example.com"
-}
-```
-## 🏋️ Workouts, Exercises & Entries
-### Workouts
-CRUD operations: create, fetch, delete
-
-Each workout is linked to a user via user_id
-
-Example workout:
-```json
-{
-    "user_id": 1,
-    "date": "2025-11-07",
-    "notes": "Chest day"
-}
-```
-### Exercises
-CRUD operations for exercises
-
-Supports multiple muscle groups and descriptions
-
-Example exercises:
-```json
-[
-    {
-        "name": "Barbell Bench Press",
-        "muscle_group": "Chest",
-        "description": "A compound exercise that targets the chest, triceps, and shoulders."
-    },
-    {
-        "name": "Barbell Squat",
-        "muscle_group": "Legs",
-        "description": "Targets quadriceps, hamstrings, and glutes."
-    }
-]
-```
-### Workout Entries
-Link workouts to exercises with sets, reps, and weight
-
-Supports detailed queries per workout or all entries
-
-Example entry:
-```json
-{
-    "workout_id": 1,
-    "exercise_id": 1,
-    "sets": 4,
-    "reps": 10,
-    "weight": 80.0
-}
-```
-## Progress Analytics
-GET/api/users/:id/progress returns per-workout summaries:
-
-total_sets, total_reps, total_volume
-
-muscle_groups distribution (volume per muscle group)
-
-top_exercises by volume
-
-Example Response:
-```json
-[
-    {
-        "date": "2025-11-07",
-        "muscle_groups": { "Chest": 5360.0 },
-        "top_exercises": [
-            { "name": "Barbell Bench Press", "volume": 3200.0 },
-            { "name": "Incline Dumbbell Press", "volume": 2160.0 }
-        ],
-        "total_reps": 22,
-        "total_sets": 7,
-        "total_volume": 5360.0,
-        "workout_id": 1
-    },
-    {
-        "date": "2025-11-08",
-        "muscle_groups": { "Hamstrings": 2880.0, "Legs": 4000.0 },
-        "top_exercises": [
-            { "name": "Barbell Squat", "volume": 4000.0 },
-            { "name": "Barbell Romanian Deadlift", "volume": 2880.0 }
-        ],
-        "total_reps": 22,
-        "total_sets": 7,
-        "total_volume": 6880.0,
-        "workout_id": 2
-    }
-]
-```
-## How to Run
-Clone the repository
-
-Create a .env file with:
-DATABASE_URL=sqlite://gymbuddy.db
-
-Run the server:
-
-cargo run
-Visit: http://127.0.0.1:3000
-
-## Next Steps
-Implement user authentication (JWT-based)
-
-Expand workout analytics (weekly/monthly summaries)
-
-Add unit and integration tests for all endpoints
-
-Build structured API documentation (docs/architecture.md)
+---
 
 ## Tech Stack
-Language: Rust
 
-Framework: Axum
+- **Language:** Rust  
+- **Framework:** Axum  
+- **Database:** SQLite  
+- **ORM / Queries:** SQLx  
+- **Authentication:** JWT  
+- **Password Hashing:** Argon2  
+- **Async Runtime:** Tokio  
+- **Logging:** tracing  
+- **Serialization:** Serde  
+- **Environment Config:** dotenvy  
+- **Testing:** Cargo (integration tests)
 
-Database: SQLite + SQLx
+---
 
-Async Runtime: Tokio
+## Project Structure
 
-Serialization: Serde
+src/
+├── api/            # Route handlers
+├── auth.rs         # Password hashing & verification
+├── jwt.rs          # JWT handling
+├── middleware/     # Auth middleware
+├── db/             # Database logic
+├── models/         # Data models
+├── main.rs         # Application entry point
+└── lib.rs
 
-Environment Management: dotenvy
+tests/
+├── api_health.rs
+└── auth_register.rs
+
+
+## Authentication
+
+- JWT-based authentication
+- Passwords hashed using **Argon2**
+- Protected routes require:
+
+Authorization header format:
+```http
+Authorization: Bearer <token>
+```
+- Authentication enforced via a custom Axum extractor
+
+---
+
+## API Endpoints
+
+### Public Endpoints
+
+| Method | Route | Description |
+|------|------|-------------|
+| POST | `/api/register` | Register a new user |
+| POST | `/api/login` | Login and receive JWT |
+| GET | `/health` | Health check |
+
+---
+
+### Protected Endpoints (JWT Required)
+
+#### Users
+| Method | Route | Description |
+|------|------|-------------|
+| GET | `/api/users` | Fetch all users |
+| GET | `/api/users/:id` | Fetch user by ID |
+| GET | `/api/users/:id/progress` | User workout analytics |
+
+#### Workouts
+| Method | Route | Description |
+|------|------|-------------|
+| GET | `/api/workouts` | List workouts |
+| POST | `/api/workouts` | Create workout |
+| GET | `/api/workouts/:id` | Fetch workout |
+| PUT | `/api/workouts/:id` | Update workout |
+| DELETE | `/api/workouts/:id` | Delete workout |
+| GET | `/api/workouts/:id/entries` | Workout entries |
+| GET | `/api/workouts/:id/summary` | Workout summary |
+
+#### Exercises
+| Method | Route | Description |
+|------|------|-------------|
+| GET | `/api/exercises` | List exercises |
+| POST | `/api/exercises` | Add exercises |
+
+#### Workout Entries
+| Method | Route | Description |
+|------|------|-------------|
+| GET | `/api/workout_entries` | List entries |
+| POST | `/api/workout_entries` | Create entry |
+| PUT | `/api/workout_entries/:id` | Update entry |
+| DELETE | `/api/workout_entries/:id` | Delete entry |
+
+#### Analytics
+| Method | Route | Description |
+|------|------|-------------|
+| GET | `/api/analytics/weekly` | Weekly analytics |
+
+---
+
+## Analytics
+
+### Weekly Analytics
+- Total training volume
+- Most trained muscle group (last 7 days)
+
+### Progress Analytics
+- Per-workout summaries
+- Total volume
+- Muscle group distribution
+- Top exercises by volume
+
+---
+
+## Logging & Observability
+
+This project uses the **tracing** crate for structured logging:
+
+- User registration & login
+- Workout creation
+- Analytics queries
+- Error handling
+
+Example logs:
+```text
+INFO Registering new user: user@example.com
+INFO Login successful for user@example.com
+INFO Fetching weekly analytics for user 1
+``` 
+---
+
+## Testing
+
+Includes integration tests for core endpoints:
+
+- Health check endpoint
+- User registration flow
+
+Run tests:
+```bash
+cargo test 
+```
+
+Running the Project
+
+1. Clone the repository
+git clone <https://github.com/kevinjacobstanly10/GymBuddy.git>
+cd GymBuddy
+
+2. Configure environment
+Create a .env file:
+DATABASE_URL=sqlite://gymbuddy.db
+
+3. Run the server
+cargo run
+Server runs at:
+http://127.0.0.1:3000
+
