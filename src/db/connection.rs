@@ -65,15 +65,15 @@ pub async fn init_db(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::query(
         "
         CREATE TABLE IF NOT EXISTS workout_entries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            workout_id INTEGER NOT NULL,
-            exercise_id INTEGER NOT NULL,
-            sets INTEGER NOT NULL,
-            reps INTEGER NOT NULL,
-            weight REAL,
-            FOREIGN KEY(workout_id) REFERENCES workouts(id),
-            FOREIGN KEY(exercise_id) REFERENCES exercises(id)
-        );
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workout_id INTEGER NOT NULL,
+    exercise_id INTEGER NOT NULL,
+    sets INTEGER NOT NULL CHECK (sets > 0),
+    reps INTEGER NOT NULL CHECK (reps > 0),
+    weight REAL CHECK (weight >= 0),
+    FOREIGN KEY(workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+    FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+    );
         ",
     )
     .execute(pool)
