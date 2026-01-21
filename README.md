@@ -2,9 +2,9 @@
 
 ##  Overview
 
-**GymBuddy** is a backend REST API built using **Rust** and **Axum** that allows users to log workouts, track training progress, analyze muscle group distribution, and view fitness analytics over time.
+**GymBuddy** is a backend REST API built using **Rust** and **Axum** that allows users to log workouts, track training progress, analyze muscle group distribution and view fitness analytics over time.
 
-The system is designed as a **high-performance and scalable backend** intended to serve a future mobile or web fitness application. It focuses on structured data modeling, secure authentication, and efficient computation of workout analytics.
+The system is designed as a **high-performance and scalable backend** intended to serve a future mobile or web fitness application. It focuses on structured data modeling, secure authentication and efficient computation of workout analytics.
 
 ---
 
@@ -19,7 +19,7 @@ GymBuddy was developed to gain experience in:
 - Observability using structured logging
 - Writing unit and integration tests
 
-Coming from a **game development background (Unity)**, this project bridges familiar concepts such as state management and performance optimization into a backend systems context. As a fitness enthusiast, GymBuddy also solves a real-world problem of accurately tracking workout history and progress beyond simple note-taking apps.
+Coming from a **game development background (Unity)**, this project bridges familiar concepts such as state management and performance optimization into a backend systems context. As a fitness enthusiast myself, GymBuddy also solves a real-world problem of accurately tracking workout history and progress beyond simple note-taking apps.
 
 ---
 
@@ -27,7 +27,7 @@ Coming from a **game development background (Unity)**, this project bridges fami
 
 - As a user, I can **register** and **log in securely**
 - As a user, I can browse **exercises categorized by muscle groups**
-- As a user, I can **log workouts** with exercises, sets, reps, and weight
+- As a user, I can **log workouts** with exercises, sets, reps and weight
 - As a user, I can view **weekly training analytics**
 - As a user, I can view **lifetime workout history and progress summaries**
 
@@ -50,7 +50,7 @@ Coming from a **game development background (Unity)**, this project bridges fami
 ---
 
 ## Project Structure
-
+```text
 src/
 ├── api/            # Route handlers
 ├── auth.rs         # Password hashing & verification
@@ -65,6 +65,7 @@ tests/
 ├── api_health.rs
 └── auth_register.rs
 
+```
 
 ## Authentication
 
@@ -166,7 +167,7 @@ INFO Fetching weekly analytics for user 1
 
 ## Testing
 
-Includes integration tests for core endpoints:
+Included integration tests for core endpoints:
 
 - Health check endpoint
 - User registration flow
@@ -191,3 +192,21 @@ cargo run
 Server runs at:
 http://127.0.0.1:3000
 
+## Project Status
+
+### Completed
+- RESTful API built with Rust and Axum
+- SQLite database integration using SQLx
+- Data models for users, workouts, exercises and workout entries
+- JWT-based authentication and authorization
+- Secure password hashing with Argon2
+- Workout analytics (weekly volume and muscle group distribution)
+- Structured logging using the tracing crate
+- Integration tests for core API endpoints
+- Full project documentation and setup guide
+
+### Planned Enhancements
+- Monthly and yearly analytics summaries
+- Gamified XP and leveling system
+- Exportable progress reports
+- Web or mobile client application
